@@ -226,7 +226,8 @@ macro_rules! merge_repeated_numeric {
                 merge_loop(values, buf, ctx, |values, buf, ctx| {
                     let mut value = Default::default();
                     $merge($wire_type, &mut value, buf, ctx)?;
-                    values.push(value);
+                    values.reserve_exact(1);
+                    values.insert(values.capacity() - 1, value);
                     Ok(())
                 })
             } else {
@@ -234,7 +235,8 @@ macro_rules! merge_repeated_numeric {
                 check_wire_type($wire_type, wire_type)?;
                 let mut value = Default::default();
                 $merge(wire_type, &mut value, buf, ctx)?;
-                values.push(value);
+                values.reserve_exact(1);
+                values.insert(values.capacity() - 1, value);
                 Ok(())
             }
         }
@@ -533,7 +535,8 @@ macro_rules! length_delimited {
             check_wire_type(WireType::LengthDelimited, wire_type)?;
             let mut value = Default::default();
             merge(wire_type, &mut value, buf, ctx)?;
-            values.push(value);
+            values.reserve_exact(1);
+            values.insert(values.capacity() - 1, value);
             Ok(())
         }
 
@@ -837,7 +840,8 @@ pub mod message {
         check_wire_type(WireType::LengthDelimited, wire_type)?;
         let mut msg = M::default();
         merge(WireType::LengthDelimited, &mut msg, buf, ctx)?;
-        messages.push(msg);
+        messages.reserve_exact(1);
+        messages.insert(messages.capacity() - 1, msg);
         Ok(())
     }
 
@@ -924,7 +928,8 @@ pub mod group {
         check_wire_type(WireType::StartGroup, wire_type)?;
         let mut msg = M::default();
         merge(tag, WireType::StartGroup, &mut msg, buf, ctx)?;
-        messages.push(msg);
+        messages.reserve_exact(1);
+        messages.insert(messages.capacity() - 1, msg);
         Ok(())
     }
 
