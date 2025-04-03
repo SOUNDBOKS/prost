@@ -123,19 +123,6 @@ impl Name for Timestamp {
     }
 }
 
-/// Implements the unstable/naive version of `Eq`: a basic equality check on the internal fields of the `Timestamp`.
-/// This implies that `normalized_ts != non_normalized_ts` even if `normalized_ts == non_normalized_ts.normalized()`.
-#[cfg(feature = "std")]
-impl Eq for Timestamp {}
-
-#[cfg(feature = "std")]
-impl std::hash::Hash for Timestamp {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.seconds.hash(state);
-        self.nanos.hash(state);
-    }
-}
-
 #[cfg(feature = "std")]
 impl From<std::time::SystemTime> for Timestamp {
     fn from(system_time: std::time::SystemTime) -> Timestamp {
@@ -425,5 +412,21 @@ mod tests {
                 case.0,
             );
         }
+    }
+
+    #[cfg(feature = "arbitrary")]
+    #[test]
+    fn check_timestamp_implements_arbitrary() {
+        use arbitrary::{Arbitrary, Unstructured};
+
+        let mut unstructured = Unstructured::new(&[]);
+
+        assert_eq!(
+            Timestamp::arbitrary(&mut unstructured),
+            Ok(Timestamp {
+                seconds: 0,
+                nanos: 0
+            })
+        );
     }
 }

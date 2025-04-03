@@ -34,7 +34,7 @@ fn main() {
     );
     config.type_attribute(
         "Foo.Custom.OneOfAttrs.Msg.field",
-        "#[derive(Eq, PartialOrd, Ord)]",
+        "#[derive(PartialOrd, Ord)]",
     );
 
     config.file_descriptor_set_path(
@@ -46,11 +46,12 @@ fn main() {
         .compile_protos(&[src.join("ident_conversion.proto")], includes)
         .unwrap();
 
-    config
+    prost_build::Config::new()
+        .btree_map(["."])
         .compile_protos(&[src.join("nesting.proto")], includes)
         .unwrap();
 
-    config
+    prost_build::Config::new()
         .compile_protos(&[src.join("recursive_oneof.proto")], includes)
         .unwrap();
 
@@ -86,7 +87,7 @@ fn main() {
         .compile_protos(&[src.join("enum_keyword_variant.proto")], includes)
         .unwrap();
 
-    config
+    prost_build::Config::new()
         .compile_protos(&[src.join("groups.proto")], includes)
         .unwrap();
 
@@ -98,7 +99,7 @@ fn main() {
         .compile_protos(&[src.join("derive_copy.proto")], includes)
         .unwrap();
 
-    config
+    prost_build::Config::new()
         .compile_protos(&[src.join("default_string_escape.proto")], includes)
         .unwrap();
 
@@ -164,11 +165,14 @@ fn main() {
     prost_build::Config::new()
         .enable_type_names()
         .type_name_domain([".type_names.Foo"], "tests")
+        .type_name_domain([".type_names.Qux"], "tests-cumulative")
         .compile_protos(&[src.join("type_names.proto")], includes)
         .unwrap();
 
     prost_build::Config::new()
         .boxed("Foo.bar")
+        .boxed("Foo.oneof_field.box_qux")
+        .boxed("Foo.boxed_bar_list")
         .compile_protos(&[src.join("boxed_field.proto")], includes)
         .unwrap();
 

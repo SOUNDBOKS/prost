@@ -15,6 +15,7 @@ use prost::Message;
 use prost_types::{FileDescriptorProto, FileDescriptorSet};
 
 use crate::code_generator::CodeGenerator;
+use crate::context::Context;
 use crate::extern_paths::ExternPaths;
 use crate::message_graph::MessageGraph;
 use crate::path::PathMap;
@@ -48,6 +49,7 @@ pub struct Config {
     pub(crate) disable_comments: PathMap<()>,
     pub(crate) skip_debug: PathMap<()>,
     pub(crate) skip_protoc_run: bool,
+    pub(crate) skip_source_info: bool,
     pub(crate) include_file: Option<PathBuf>,
     pub(crate) prost_path: Option<String>,
     #[cfg(feature = "format")]
@@ -186,11 +188,11 @@ impl Config {
     /// # Arguments
     ///
     /// **`path`** - a path matching any number of fields. These fields get the attribute.
-    /// For details about matching fields see [`btree_map`](#method.btree_map).
+    /// For details about matching fields see [`btree_map`](Self::btree_map).
     ///
     /// **`attribute`** - an arbitrary string that'll be placed before each matched field. The
     /// expected usage are additional attributes, usually in concert with whole-type
-    /// attributes set with [`type_attribute`](method.type_attribute), but it is not
+    /// attributes set with [`type_attribute`](Self::type_attribute), but it is not
     /// checked and anything can be put there.
     ///
     /// Note that the calls to this method are cumulative ‒ if multiple paths from multiple calls
@@ -219,7 +221,7 @@ impl Config {
     /// # Arguments
     ///
     /// **`paths`** - a path matching any number of types. It works the same way as in
-    /// [`btree_map`](#method.btree_map), just with the field name omitted.
+    /// [`btree_map`](Self::btree_map), just with the field name omitted.
     ///
     /// **`attribute`** - an arbitrary string to be placed before each matched type. The
     /// expected usage are additional attributes, but anything is allowed.
@@ -229,7 +231,7 @@ impl Config {
     /// it.
     ///
     /// For things like serde it might be needed to combine with [field
-    /// attributes](#method.field_attribute).
+    /// attributes](Self::field_attribute).
     ///
     /// # Examples
     ///
@@ -268,7 +270,7 @@ impl Config {
     /// # Arguments
     ///
     /// **`paths`** - a path matching any number of types. It works the same way as in
-    /// [`btree_map`](#method.btree_map), just with the field name omitted.
+    /// [`btree_map`](Self::btree_map), just with the field name omitted.
     ///
     /// **`attribute`** - an arbitrary string to be placed before each matched type. The
     /// expected usage are additional attributes, but anything is allowed.
@@ -278,7 +280,7 @@ impl Config {
     /// it.
     ///
     /// For things like serde it might be needed to combine with [field
-    /// attributes](#method.field_attribute).
+    /// attributes](Self::field_attribute).
     ///
     /// # Examples
     ///
@@ -307,7 +309,7 @@ impl Config {
     /// # Arguments
     ///
     /// **`paths`** - a path matching any number of types. It works the same way as in
-    /// [`btree_map`](#method.btree_map), just with the field name omitted.
+    /// [`btree_map`](Self::btree_map), just with the field name omitted.
     ///
     /// **`attribute`** - an arbitrary string to be placed before each matched type. The
     /// expected usage are additional attributes, but anything is allowed.
@@ -317,7 +319,7 @@ impl Config {
     /// it.
     ///
     /// For things like serde it might be needed to combine with [field
-    /// attributes](#method.field_attribute).
+    /// attributes](Self::field_attribute).
     ///
     /// # Examples
     ///
@@ -356,7 +358,7 @@ impl Config {
     /// # Arguments
     ///
     /// **`path`** - a path matching any number of fields. These fields get the attribute.
-    /// For details about matching fields see [`btree_map`](#method.btree_map).
+    /// For details about matching fields see [`btree_map`](Self::btree_map).
     ///
     /// # Examples
     ///
@@ -597,6 +599,27 @@ impl Config {
         self
     }
 
+    /// Configures the code generator to remove surrounding comments and documentation.
+    ///
+    /// If enabled, this will cause `protoc` to not be passed the `--include_source_info` argument.
+    /// Typically, `--include_source_info` is passed by default, but it results in larger
+    /// [`FileDescriptorSet`s](https://github.com/protocolbuffers/protobuf/blob/cff254d32f850ba8186227ce6775b3f01a1f8cf8/src/google/protobuf/descriptor.proto#L54-L66) that include information about the
+    /// original location of each declaration in the source file as well as surrounding
+    /// comments and documentation.
+    ///
+    /// In `build.rs`:
+    ///
+    /// ```rust
+    /// # let mut config = prost_build::Config::new();
+    /// config.file_descriptor_set_path("path/from/build/system")
+    ///     .skip_source_info()
+    ///     .compile_protos(&["src/items.proto"], &["src/"]);
+    /// ```
+    pub fn skip_source_info(&mut self) -> &mut Self {
+        self.skip_source_info = true;
+        self
+    }
+
     /// Configures the code generator to not strip the enum name from variant names.
     ///
     /// Protobuf enum definitions commonly include the enum name as a prefix of every variant name.
@@ -644,7 +667,7 @@ impl Config {
     /// # Domains
     ///
     /// **`paths`** - a path matching any number of types. It works the same way as in
-    /// [`btree_map`](#method.btree_map), just with the field name omitted.
+    /// [`btree_map`](Self::btree_map), just with the field name omitted.
     ///
     /// **`domain`** - an arbitrary string to be used as a prefix for type URLs.
     ///
@@ -662,7 +685,6 @@ impl Config {
         S: AsRef<str>,
         D: AsRef<str>,
     {
-        self.type_name_domains.clear();
         for matcher in paths {
             self.type_name_domains
                 .insert(matcher.as_ref().to_string(), domain.as_ref().to_string());
@@ -706,7 +728,7 @@ impl Config {
     /// Set the path to `protoc` executable to be used by `prost-build`
     ///
     /// Use the provided path to find `protoc`. This can either be a file name which is
-    /// searched for in the `PATH` or an aboslute path to use a specific executable.
+    /// searched for in the `PATH` or an absolute path to use a specific executable.
     ///
     /// # Example `build.rs`
     ///
@@ -888,6 +910,7 @@ impl Config {
     ) -> Result<FileDescriptorSet> {
         let tmp;
         let file_descriptor_set_path = if let Some(path) = &self.file_descriptor_set_path {
+            println!("cargo:rerun-if-changed={}", path.display());
             path.clone()
         } else {
             if self.skip_protoc_run {
@@ -902,12 +925,14 @@ impl Config {
 
         if !self.skip_protoc_run {
             let mut cmd = Command::new(&self.protoc_executable);
-            cmd.arg("--include_imports")
-                .arg("--include_source_info")
-                .arg("-o")
-                .arg(&file_descriptor_set_path);
+            cmd.arg("--include_imports");
+            if !self.skip_source_info {
+                cmd.arg("--include_source_info");
+            }
+            cmd.arg("-o").arg(&file_descriptor_set_path);
 
             for include in includes {
+                println!("cargo:rerun-if-changed={}", include.as_ref().display());
                 if include.as_ref().exists() {
                     cmd.arg("-I").arg(include.as_ref());
                 } else {
@@ -929,6 +954,7 @@ impl Config {
             }
 
             for proto in protos {
+                println!("cargo:rerun-if-changed={}", proto.as_ref().display());
                 cmd.arg(proto.as_ref());
             }
 
@@ -999,12 +1025,6 @@ impl Config {
         protos: &[impl AsRef<Path>],
         includes: &[impl AsRef<Path>],
     ) -> Result<()> {
-        // TODO: This should probably emit 'rerun-if-changed=PATH' directives for cargo, however
-        // according to [1] if any are output then those paths replace the default crate root,
-        // which is undesirable. Figure out how to do it in an additive way; perhaps gcc-rs has
-        // this figured out.
-        // [1]: http://doc.crates.io/build-script.html#outputs-of-the-build-script
-
         let file_descriptor_set = self.load_fds(protos, includes)?;
 
         self.compile_fds(file_descriptor_set)
@@ -1078,9 +1098,10 @@ impl Config {
         let mut modules = HashMap::new();
         let mut packages = HashMap::new();
 
-        let message_graph = MessageGraph::new(requests.iter().map(|x| &x.1), self.boxed.clone());
+        let message_graph = MessageGraph::new(requests.iter().map(|x| &x.1));
         let extern_paths = ExternPaths::new(&self.extern_paths, self.prost_types)
             .map_err(|error| Error::new(ErrorKind::InvalidInput, error))?;
+        let mut context = Context::new(self, message_graph, extern_paths);
 
         for (request_module, request_fd) in requests {
             // Only record packages that have services
@@ -1090,14 +1111,14 @@ impl Config {
             let buf = modules
                 .entry(request_module.clone())
                 .or_insert_with(String::new);
-            CodeGenerator::generate(self, &message_graph, &extern_paths, request_fd, buf);
+            CodeGenerator::generate(&mut context, request_fd, buf);
             if buf.is_empty() {
                 // Did not generate any code, remove from list to avoid inclusion in include file or output file list
                 modules.remove(&request_module);
             }
         }
 
-        if let Some(ref mut service_generator) = self.service_generator {
+        if let Some(service_generator) = context.service_generator_mut() {
             for (module, package) in packages {
                 let buf = modules.get_mut(&module).unwrap();
                 service_generator.finalize_package(&package, buf);
@@ -1170,6 +1191,7 @@ impl default::Default for Config {
             disable_comments: PathMap::default(),
             skip_debug: PathMap::default(),
             skip_protoc_run: false,
+            skip_source_info: false,
             include_file: None,
             prost_path: None,
             #[cfg(feature = "format")]
@@ -1223,6 +1245,7 @@ pub fn error_message_protoc_not_found() -> String {
 
 /// Returns the path to the `protoc` binary.
 pub fn protoc_from_env() -> PathBuf {
+    println!("cargo:rerun-if-env-changed=PROTOC");
     env::var_os("PROTOC")
         .map(PathBuf::from)
         .unwrap_or(PathBuf::from("protoc"))
@@ -1230,6 +1253,7 @@ pub fn protoc_from_env() -> PathBuf {
 
 /// Returns the path to the Protobuf include directory.
 pub fn protoc_include_from_env() -> Option<PathBuf> {
+    println!("cargo:rerun-if-env-changed=PROTOC_INCLUDE");
     let protoc_include: PathBuf = env::var_os("PROTOC_INCLUDE")?.into();
 
     if !protoc_include.exists() {

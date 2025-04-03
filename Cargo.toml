@@ -9,6 +9,8 @@ members = [
   "protobuf",
   "tests",
   "tests-2015",
+  "tests-2018",
+  "tests-2024",
   "tests-no-std",
   "tests/single-include",
   "fuzz",
@@ -17,7 +19,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.13.4"
+version = "0.13.5"
 authors = [
   "Dan Burkert <dan@danburkert.com>",
   "Lucio Franco <luciofranco14@gmail.com>",

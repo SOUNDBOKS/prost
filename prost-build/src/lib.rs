@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/prost-build/0.13.4")]
+#![doc(html_root_url = "https://docs.rs/prost-build/0.13.5")]
 #![allow(clippy::option_as_ref_deref, clippy::format_push_string)]
 
 //! `prost-build` compiles `.proto` files into Rust.
@@ -115,7 +115,7 @@
 //! PROTOC=/usr/local/bin/protoc
 //! ```
 //!
-//! Alternatively, the path to `protoc` execuatable can be explicitly set
+//! Alternatively, the path to `protoc` executable can be explicitly set
 //! via [`Config::protoc_executable()`].
 //!
 //! If `prost-build` can not find `protoc`
@@ -147,6 +147,7 @@ mod collections;
 pub(crate) use collections::{BytesType, MapType};
 
 mod code_generator;
+mod context;
 mod extern_paths;
 mod ident;
 mod message_graph;
@@ -182,7 +183,7 @@ pub trait ServiceGenerator {
     /// Finalizes the generation process.
     ///
     /// In case there's something that needs to be output at the end of the generation process, it
-    /// goes here. Similar to [`generate`](#method.generate), the output should be appended to
+    /// goes here. Similar to [`generate`](Self::generate), the output should be appended to
     /// `buf`.
     ///
     /// An example can be a module or other thing that needs to appear just once, not for each
@@ -196,7 +197,7 @@ pub trait ServiceGenerator {
 
     /// Finalizes the generation process for an entire protobuf package.
     ///
-    /// This differs from [`finalize`](#method.finalize) by where (and how often) it is called
+    /// This differs from [`finalize`](Self::finalize) by where (and how often) it is called
     /// during the service generator life cycle. This method is called once per protobuf package,
     /// making it ideal for grouping services within a single package spread across multiple
     /// `.proto` files.
@@ -396,10 +397,10 @@ mod tests {
         let tempdir = tempfile::tempdir().unwrap();
 
         let state = Rc::new(RefCell::new(MockState::default()));
-        let gen = MockServiceGenerator::new(Rc::clone(&state));
+        let generator = MockServiceGenerator::new(Rc::clone(&state));
 
         Config::new()
-            .service_generator(Box::new(gen))
+            .service_generator(Box::new(generator))
             .include_file("_protos.rs")
             .out_dir(tempdir.path())
             .compile_protos(
@@ -466,13 +467,13 @@ mod tests {
     fn test_generate_no_empty_outputs() {
         let _ = env_logger::try_init();
         let state = Rc::new(RefCell::new(MockState::default()));
-        let gen = MockServiceGenerator::new(Rc::clone(&state));
+        let generator = MockServiceGenerator::new(Rc::clone(&state));
         let include_file = "_include.rs";
         let tempdir = tempfile::tempdir().unwrap();
         let previously_empty_proto_path = tempdir.path().join(Path::new("google.protobuf.rs"));
 
         Config::new()
-            .service_generator(Box::new(gen))
+            .service_generator(Box::new(generator))
             .include_file(include_file)
             .out_dir(tempdir.path())
             .compile_protos(
@@ -528,12 +529,12 @@ mod tests {
 
         for _ in 1..10 {
             let state = Rc::new(RefCell::new(MockState::default()));
-            let gen = MockServiceGenerator::new(Rc::clone(&state));
+            let generator = MockServiceGenerator::new(Rc::clone(&state));
             let include_file = "_include.rs";
             let tempdir = tempfile::tempdir().unwrap();
 
             Config::new()
-                .service_generator(Box::new(gen))
+                .service_generator(Box::new(generator))
                 .include_file(include_file)
                 .out_dir(tempdir.path())
                 .compile_protos(
