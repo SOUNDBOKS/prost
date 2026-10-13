@@ -34,6 +34,7 @@ impl DecodeError {
     /// Meant to be used only by `Message` implementations.
     #[doc(hidden)]
     #[cold]
+    #[inline(never)]
     pub fn new(description: impl Into<Cow<'static, str>>) -> DecodeError {
         DecodeError {
             inner: Box::new(Inner {
@@ -47,9 +48,19 @@ impl DecodeError {
     ///
     /// Meant to be used only by `Message` implementations.
     #[doc(hidden)]
+    #[cfg(feature = "std")]
+    #[cold]
+    #[inline(never)]
     pub fn push(&mut self, message: &'static str, field: &'static str) {
         self.inner.stack.push((message, field));
     }
+
+    /// Without std nothing prints the location stack, and recording it costs every field of every
+    /// message a call and two name strings in flash. As a no-op the optimizer drops all of it.
+    #[doc(hidden)]
+    #[cfg(not(feature = "std"))]
+    #[inline(always)]
+    pub fn push(&mut self, _message: &'static str, _field: &'static str) {}
 }
 
 impl fmt::Debug for DecodeError {

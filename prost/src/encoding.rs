@@ -5,6 +5,7 @@
 #![allow(clippy::implicit_hasher, clippy::ptr_arg)]
 
 use alloc::collections::BTreeMap;
+#[cfg(any(feature = "std", test))]
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -115,7 +116,7 @@ pub fn encode_key(tag: u32, wire_type: WireType, buf: &mut impl BufMut) {
 pub fn decode_key(buf: &mut impl Buf) -> Result<(u32, WireType), DecodeError> {
     let key = decode_varint(buf)?;
     if key > u64::from(u32::MAX) {
-        return Err(DecodeError::new(format!("invalid key value: {}", key)));
+        return Err(invalid_key_value(key));
     }
     let wire_type = WireType::try_from(key & 0x07)?;
     let tag = key as u32 >> 3;
@@ -125,6 +126,15 @@ pub fn decode_key(buf: &mut impl Buf) -> Result<(u32, WireType), DecodeError> {
     }
 
     Ok((tag, wire_type))
+}
+
+#[cold]
+#[inline(never)]
+fn invalid_key_value(_key: u64) -> DecodeError {
+    #[cfg(feature = "std")]
+    return DecodeError::new(format!("invalid key value: {}", _key));
+    #[cfg(not(feature = "std"))]
+    return DecodeError::new("invalid key value");
 }
 
 /// Returns the width of an encoded Protobuf field key with the given tag.
@@ -718,10 +728,11 @@ pub mod bytes {
         //
         // [1]: https://developers.google.com/protocol-buffers/docs/encoding#optional
         //
-        // This is intended for A and B both being Bytes so it is zero-copy.
-        // Some combinations of A and B types may cause a double-copy,
-        // in which case merge_one_copy() should be used instead.
-        value.replace_with(buf.copy_to_bytes(len));
+        // Upstream passes `buf.copy_to_bytes(len)`. Decoding a `Vec<u8>` field from `&[u8]`, the
+        // usual case without std, that allocates a `Bytes`, copies twice and links all of `Bytes`'
+        // vtables. `take` lets a `Vec<u8>` copy once, and `Take::copy_to_bytes` still gives a
+        // `Bytes` field the zero-copy path.
+        value.replace_with(buf.take(len));
         Ok(())
     }
 
